@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<head>
+  <title>Flimmer mit Pusher</title>
+  <script src="https://js.pusher.com/6.0/pusher.min.js"></script>
+  <script>
+
+    // Enable pusher logging - don't include this in production
+    Pusher.logToConsole = true;
+
+    const pusher = new Pusher('0aa09d7dd8afa3010181', {
+      cluster: 'eu'
+    });
+
+    const incomingMessage = function(data) {
+      const el = document.createElement('p')
+      el.append(`${data.username}  - ${data.message}`)
+      return el;
+    }
+    window.subscribe = function(sink) {
+      const channel = pusher.subscribe('flimmer');
+      channel.bind('beacon', function(data) {
+        sink.prepend(incomingMessage(data))
+      });
+
+      function cancel() {
+        channel.unbind();
+      }
+
+      function send(data) {
+        const body = new FormData(); 
+        for (let [k, v] of Object.entries(data)) {
+          body.append(k, v);
+        }
+        fetch('/message', {'method': 'POST', body})
+      }
+      return {
+        send, cancel
+      }
+    }
+  </script>
+  <style>
+    .hide {
+      visibility: hidden;
+    }
+  </style>
+</head>
+<body>
+  <h1>Flimmer</h1>
+  <div>
+    <form name="joinForm">
+      <label for="name">Name: <input name="name"/></label>
+      <button>Join</button>
+    </form>
+    <form name="chatForm" class="hide">
+      <label for="name">Message: <input name="message"/></label>
+      <button>Send</button>
+    </form>
+    <form name="leaveForm" class="hide">
+      <button>Leave</button>
+    </form>
+
+  </div>
+  <div id="messages"></div>
+
+  <script>
+    document.joinForm.onsubmit = function(e) {
+      e.preventDefault();
+      document.joinForm.classList = ["hide"]
+      document.leaveForm.classList = []
+      document.chatForm.classList = []
+
+      const username = document.joinForm.name.value
+      const subscription = subscribe(document.getElementById("messages"))
+      subscription.send({username,  message: "🚶"});
+
+      document.chatForm.onsubmit = function (e) {
+        e.preventDefault();
+        const message = e.target.message.value;
+        subscription.send({username,  message});
+      }
+      
+      document.leaveForm.onsubmit = function(e) {
+        e.preventDefault();
+        subscription.send({username,  message: "👋"});
+        document.joinForm.classList = [];
+        document.leaveForm.classList = ["hide"]
+        document.chatForm.classList = ["hide"]
+        subscription.cancel()
+      }
+    } 
+  </script>
+</body>
